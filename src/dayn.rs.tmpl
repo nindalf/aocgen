@@ -1,0 +1,41 @@
+#[allow(dead_code)]
+fn part_1(input: String) -> i32 \{
+    0
+}
+
+#[allow(dead_code)]
+fn part_2(input: String) -> i32 \{
+    0
+}
+
+#[cfg(test)]
+mod tests \{
+    use anyhow::Result;
+
+    #[test]
+    fn part_1_test() -> Result<()> \{
+        test("inputs/day{n}-test.txt", &super::part_1, 1234)
+    }
+
+    #[test]
+    fn part_1_real() -> Result<()> \{
+        test("inputs/day{n}.txt", &super::part_1, 1234)
+    }
+
+    #[test]
+    fn part_2_test() -> Result<()> \{
+        test("inputs/day{n}-test.txt", &super::part_2, 1234)
+    }
+
+    #[test]
+    fn part_2_real() -> Result<()> \{
+        test("inputs/day{n}.txt", &super::part_2, 1234)
+    }
+
+    fn test(test_file: &str, function: &dyn Fn(String) -> i32, expected_val: i32) -> Result<()> \{
+        let input = crate::files::read_string(test_file)?;
+        let result = function(input);
+        assert_eq!(result, expected_val);
+        Ok(())
+    }
+}
