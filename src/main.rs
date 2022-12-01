@@ -3,6 +3,7 @@ use clap::Parser;
 use tinytemplate::TinyTemplate;
 
 static TEMPLATE: &'static str = include_str!("dayn.rs.tmpl");
+static FILES_RS: &'static str = include_str!("files.rs");
 
 /// Generate the Rust file for that day's Advent of Code challenge
 #[derive(Parser, Debug)]
@@ -25,10 +26,16 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let n = format!("{:01$}", args.day, 2);
 
-    let rs_path = std::path::Path::new("src").join(format!("day{n}.rs"));
+    let src = std::path::Path::new("src");
+    let rs_path = src.join(format!("day{n}.rs"));
     if !rs_path.exists() {
         let rendered = rendered_template(&n)?;
         std::fs::write(rs_path, rendered)?;
+    }
+    
+    let files_rs_path = src.join(format!("files.rs"));
+    if !files_rs_path.exists() {
+        std::fs::write(files_rs_path, FILES_RS)?;
     }
 
     let inputs = std::path::Path::new("inputs");
