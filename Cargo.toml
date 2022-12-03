@@ -11,3 +11,4 @@ clap = { version = "4", features = ["derive"] }
 tinytemplate = "1"
 serde = { version = "1", features = ["derive"] }
 reqwest = {version = "0.11.13", features = ["blocking"] }
+scraper = "0.13.0"

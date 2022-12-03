@@ -19,7 +19,6 @@ Set up a new project
 ```
 cargo new advent-2022     # create new project
 cd advent-2022/
-cargo add anyhow          # improved error handling
 ```
 
 Set env variable with the adventofcode.com session cookie. This allows `aocgen` to fetch each day's test input. This can be fetched from dev tools after logging in on the website.

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use scraper::{Html, Selector};
 use tinytemplate::TinyTemplate;
 
 static TEMPLATE: &str = include_str!("dayn.rs.tmpl");
@@ -37,15 +38,16 @@ fn main() -> Result<()> {
         std::fs::create_dir(inputs)?;
     }
 
-    let dummy_test_input = inputs.join(format!("day{n}-test.txt"));
-    if !dummy_test_input.exists() {
-        std::fs::File::create(dummy_test_input)?;
+    let test_input_file = inputs.join(format!("day{n}-test.txt"));
+    if !test_input_file.exists() {
+        let test_input = fetch_test_input(args.year, args.day)?;
+        std::fs::write(test_input_file, test_input)?;
     }
 
-    let real_test_input = inputs.join(format!("day{n}.txt"));
-    if !real_test_input.exists() {
-        let test_input = fetch_test_input(args.year, args.day)?;
-        std::fs::write(real_test_input, test_input)?;
+    let real_input_file = inputs.join(format!("day{n}.txt"));
+    if !real_input_file.exists() {
+        let real_input = fetch_real_input(args.year, args.day)?;
+        std::fs::write(real_input_file, real_input)?;
     }
 
     Ok(())
@@ -59,6 +61,30 @@ fn rendered_template(n: &str) -> Result<String> {
 }
 
 fn fetch_test_input(year: u32, day: u32) -> Result<String> {
+    let url = format!("https://adventofcode.com/{year}/day/{day}");
+    let client = reqwest::blocking::Client::new();
+    let cookie = std::env::var("AOC_COOKIE")?;
+    let request = client
+        .get(url)
+        .header("cookie", format!("session={cookie}"))
+        .build()?;
+    let html = client.execute(request)?.text()?;
+    largest_code_block(&html)
+}
+
+fn largest_code_block(html: &str) -> Result<String> {
+    let fragment = Html::parse_fragment(&html);
+    let code_selector = Selector::parse("code").unwrap();
+    let mut code_fragments: Vec<String> = fragment.select(&code_selector)
+        .filter_map(|element| element.first_child())
+        .filter_map(|child| child.value().as_text())
+        .map(|text| text.to_string())
+        .collect();
+    code_fragments.sort_by(|a, b| a.len().cmp(&b.len()));
+    code_fragments.pop().ok_or_else(|| anyhow::anyhow!("No code blocks found"))
+}
+
+fn fetch_real_input(year: u32, day: u32) -> Result<String> {
     let url = format!("https://adventofcode.com/{year}/day/{day}/input");
     let client = reqwest::blocking::Client::new();
     let cookie = std::env::var("AOC_COOKIE")?;
