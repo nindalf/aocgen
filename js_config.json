@@ -1,0 +1,6 @@
+{
+    "template_name": "js",
+    "exec_file_paths": ["{n}-1/main.js", "{n}-2/main.js"],
+    "input_file_paths": ["{n}-1/input", "{n}-2/input"],
+    "test_input_file_paths": ["{n}-1/test-input", "{n}-2/test-input"]
+}
