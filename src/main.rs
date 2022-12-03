@@ -66,7 +66,7 @@ fn write_to_files(content: &str, paths: &[PathBuf]) -> Result<()> {
     for path in paths {
         if path.exists() {
             // file already exists, do nothing
-            continue
+            continue;
         }
         if let Some(parent) = path.parent() {
             if !parent.exists() {
@@ -89,16 +89,16 @@ fn get_config(n: &str, path: PathBuf) -> Result<MaterialisedConfig> {
     let exec_file_template = match config.template_name.as_str() {
         "rust" => RUST_TEMPLATE,
         "js" => JS_TEMPLATE,
-        _ => panic!("Unsupported template")
+        _ => panic!("Unsupported template"),
     };
-    tt.add_template("exec_file", &exec_file_template).unwrap();
+    tt.add_template("exec_file", exec_file_template).unwrap();
     let template = tt.render("exec_file", &context).unwrap();
 
     let exec_file_paths: Vec<_> = config
         .exec_file_paths
         .iter()
         .map(|s| {
-            tt.add_template("temp", &s).unwrap();
+            tt.add_template("temp", s).unwrap();
             PathBuf::from(tt.render("temp", &context).unwrap())
         })
         .collect();
@@ -106,7 +106,7 @@ fn get_config(n: &str, path: PathBuf) -> Result<MaterialisedConfig> {
         .test_input_file_paths
         .iter()
         .map(|s| {
-            tt.add_template("temp", &s).unwrap();
+            tt.add_template("temp", s).unwrap();
             PathBuf::from(tt.render("temp", &context).unwrap())
         })
         .collect();
@@ -114,7 +114,7 @@ fn get_config(n: &str, path: PathBuf) -> Result<MaterialisedConfig> {
         .input_file_paths
         .iter()
         .map(|s| {
-            tt.add_template("temp", &s).unwrap();
+            tt.add_template("temp", s).unwrap();
             PathBuf::from(tt.render("temp", &context).unwrap())
         })
         .collect();
@@ -139,7 +139,7 @@ fn fetch_test_input(year: u32, day: u32) -> Result<String> {
 }
 
 fn largest_code_block(html: &str) -> Result<String> {
-    let fragment = Html::parse_fragment(&html);
+    let fragment = Html::parse_fragment(html);
     let code_selector = Selector::parse("code").unwrap();
     let mut code_fragments: Vec<String> = fragment
         .select(&code_selector)
@@ -147,7 +147,7 @@ fn largest_code_block(html: &str) -> Result<String> {
         .filter_map(|child| child.value().as_text())
         .map(|text| text.to_string())
         .collect();
-    code_fragments.sort_by(|a, b| a.len().cmp(&b.len()));
+    code_fragments.sort_by_key(|a| a.len());
     code_fragments
         .pop()
         .ok_or_else(|| anyhow::anyhow!("No code blocks found"))
