@@ -42,8 +42,9 @@ struct Context {
     n: String,
 }
 
-static RUST_TEMPLATE: &str = include_str!("../templates/rust.tmpl");
 static JS_TEMPLATE: &str = include_str!("../templates/js.tmpl");
+static PYTHON_TEMPLATE: &str = include_str!("../templates/python.tmpl");
+static RUST_TEMPLATE: &str = include_str!("../templates/rust.tmpl");
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -87,8 +88,9 @@ fn get_config(n: &str, path: PathBuf) -> Result<MaterialisedConfig> {
     let mut tt = TinyTemplate::new();
 
     let exec_file_template = match config.template_name.as_str() {
-        "rust" => RUST_TEMPLATE,
         "js" => JS_TEMPLATE,
+        "python" => PYTHON_TEMPLATE,
+        "rust" => RUST_TEMPLATE,
         _ => panic!("Unsupported template"),
     };
     tt.add_template("exec_file", exec_file_template).unwrap();

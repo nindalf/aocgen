@@ -1,0 +1,36 @@
+import unittest
+
+def part_1(input: list[str]) -> int:
+    return 0
+
+def part_2(input: list[str]) -> int:
+    return 0
+
+class TestDay{n}(unittest.TestCase):
+
+    def test_part_1_dummy(self):
+        with open("inputs/day{n}-test.txt", 'r') as f:
+            output = part_1(f.readlines())
+            expected = 1234
+            self.assertEqual(expected, output)
+        
+    def test_part_1(self):
+        with open("inputs/day{n}.txt", 'r') as f:
+            output = part_1(f.readlines())
+            expected = 1234
+            self.assertEqual(expected, output)
+
+    def test_part_2_dummy(self):
+        with open("inputs/day{n}-test.txt", 'r') as f:
+            output = part_2(f.readlines())
+            expected = 1234
+            self.assertEqual(expected, output)
+
+    def test_part_2(self):
+        with open("inputs/day{n}.txt", 'r') as f:
+            output = part_2(f.readlines())
+            expected = 1234
+            self.assertEqual(expected, output)
+
+if __name__ == '__main__':
+    unittest.main()
