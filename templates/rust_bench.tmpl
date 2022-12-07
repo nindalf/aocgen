@@ -1,0 +1,22 @@
+#[macro_use]
+extern crate criterion;
+use criterion::\{Criterion, black_box};
+
+{{ for n in days }}
+static DAY_{n}_INPUT: &str = include_str!("../inputs/day{n}.txt");
+{{ endfor }}
+
+{{ for n in days }}
+fn bench_{n}(c: &mut Criterion) \{
+    c.bench_function("Day {n} Part 1", |b| b.iter(|| advent_2022::day{n}::part_1(black_box(DAY_{n}_INPUT))));
+    c.bench_function("Day {n} Part 2", |b| b.iter(|| advent_2022::day{n}::part_2(black_box(DAY_{n}_INPUT))));
+}
+{{ endfor }}
+
+criterion_group!(
+    benches, 
+    {{ for n in days }}
+    bench_{n},
+    {{ endfor }}
+);
+criterion_main!(benches);

@@ -12,12 +12,15 @@ struct LangConfig {
     exec_file_paths: Vec<String>,
     input_file_paths: Vec<String>,
     test_input_file_paths: Vec<String>,
+    bench_file_paths: Vec<String>,
 }
 
 #[derive(Debug)]
 struct MaterialisedConfig {
     template: String,
     exec_file_paths: Vec<PathBuf>,
+    bench_template: String,
+    bench_file_paths: Vec<PathBuf>,
     input_file_paths: Vec<PathBuf>,
     test_input_file_paths: Vec<PathBuf>,
 }
@@ -40,25 +43,33 @@ struct Args {
 #[derive(serde::Serialize, Debug)]
 struct Context {
     n: String,
+    days: Vec<String>,
 }
 
 static JS_TEMPLATE: &str = include_str!("../templates/js.tmpl");
 static PYTHON_TEMPLATE: &str = include_str!("../templates/python.tmpl");
 static RUST_TEMPLATE: &str = include_str!("../templates/rust.tmpl");
 
+static RUST_BENCH_TEMPLATE: &str = include_str!("../templates/rust_bench.tmpl");
+
 fn main() -> Result<()> {
     let args = Args::parse();
     let n = format!("{:01$}", args.day, 2);
+    let days = (1..=args.day).map(|day| format!("{:01$}", day, 2)).collect::<Vec<_>>();
+    let context = Context {n, days};
 
-    let config = get_config(&n, args.config)?;
+    let config = get_config(&context, args.config)?;
 
     write_to_files(&config.template, &config.exec_file_paths)?;
+
+    write_to_files(&config.bench_template, &config.bench_file_paths)?;
 
     let test_input = fetch_test_input(args.year, args.day)?;
     write_to_files(&test_input, &config.test_input_file_paths)?;
 
     let real_input = fetch_real_input(args.year, args.day)?;
     write_to_files(&real_input, &config.input_file_paths)?;
+
 
     Ok(())
 }
@@ -79,12 +90,11 @@ fn write_to_files(content: &str, paths: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
-fn get_config(n: &str, path: PathBuf) -> Result<MaterialisedConfig> {
+fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
     let config_file = File::open(path)?;
     let reader = BufReader::new(config_file);
     let config: LangConfig = serde_json::from_reader(reader)?;
 
-    let context = Context { n: n.to_string() };
     let mut tt = TinyTemplate::new();
 
     let exec_file_template = match config.template_name.as_str() {
@@ -95,6 +105,22 @@ fn get_config(n: &str, path: PathBuf) -> Result<MaterialisedConfig> {
     };
     tt.add_template("exec_file", exec_file_template).unwrap();
     let template = tt.render("exec_file", &context).unwrap();
+
+    let bench_file_template = match config.template_name.as_str() {
+        "rust" => RUST_BENCH_TEMPLATE,
+        _ => panic!("Unsupported template"),
+    };
+    tt.add_template("bench_file", bench_file_template).unwrap();
+    let bench_template = tt.render("bench_file", &context).unwrap();
+    
+    let bench_file_paths: Vec<_> = config
+        .bench_file_paths
+        .iter()
+        .map(|s| {
+            tt.add_template("temp", s).unwrap();
+            PathBuf::from(tt.render("temp", &context).unwrap())
+        })
+        .collect();
 
     let exec_file_paths: Vec<_> = config
         .exec_file_paths
@@ -123,6 +149,8 @@ fn get_config(n: &str, path: PathBuf) -> Result<MaterialisedConfig> {
     Ok(MaterialisedConfig {
         template,
         exec_file_paths,
+        bench_template,
+        bench_file_paths,
         input_file_paths,
         test_input_file_paths,
     })
