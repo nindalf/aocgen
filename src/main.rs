@@ -13,6 +13,7 @@ struct LangConfig {
     input_file_paths: Vec<String>,
     test_input_file_paths: Vec<String>,
     bench_file_paths: Vec<String>,
+    readme_file_paths: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -23,6 +24,7 @@ struct MaterialisedConfig {
     bench_file_paths: Vec<PathBuf>,
     input_file_paths: Vec<PathBuf>,
     test_input_file_paths: Vec<PathBuf>,
+    readme_file_paths: Vec<PathBuf>,
 }
 
 /// Generate the Rust file for that day's Advent of Code challenge
@@ -43,7 +45,9 @@ struct Args {
 #[derive(serde::Serialize, Debug)]
 struct Context {
     n: String,
-    days: Vec<String>,
+    day: u32,
+    year: u32,
+    problem_statement: String,
 }
 
 static JS_TEMPLATE: &str = include_str!("../templates/js.tmpl");
@@ -52,11 +56,17 @@ static RUST_TEMPLATE: &str = include_str!("../templates/rust.tmpl");
 
 static RUST_BENCH_TEMPLATE: &str = include_str!("../templates/rust_bench.tmpl");
 
+static README_TEMPLATE: &str = include_str!("../templates/readme.tmpl");
+
 fn main() -> Result<()> {
     let args = Args::parse();
     let n = format!("{:01$}", args.day, 2);
-    let days = (1..=args.day).map(|day| format!("{:01$}", day, 2)).collect::<Vec<_>>();
-    let context = Context {n, days};
+    let context = Context {
+        n,
+        day: args.day,
+        year: args.year,
+        problem_statement: "".to_owned(),
+    };
 
     let config = get_config(&context, args.config)?;
 
@@ -70,6 +80,8 @@ fn main() -> Result<()> {
     let real_input = fetch_real_input(args.year, args.day)?;
     write_to_files(&real_input, &config.input_file_paths)?;
 
+    let readme = fetch_readme(args.year, args.day, "".to_owned())?;
+    write_to_files(&readme, &config.readme_file_paths)?;
 
     Ok(())
 }
@@ -112,40 +124,13 @@ fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
     };
     tt.add_template("bench_file", bench_file_template).unwrap();
     let bench_template = tt.render("bench_file", &context).unwrap();
-    
-    let bench_file_paths: Vec<_> = config
-        .bench_file_paths
-        .iter()
-        .map(|s| {
-            tt.add_template("temp", s).unwrap();
-            PathBuf::from(tt.render("temp", &context).unwrap())
-        })
-        .collect();
 
-    let exec_file_paths: Vec<_> = config
-        .exec_file_paths
-        .iter()
-        .map(|s| {
-            tt.add_template("temp", s).unwrap();
-            PathBuf::from(tt.render("temp", &context).unwrap())
-        })
-        .collect();
-    let test_input_file_paths: Vec<_> = config
-        .test_input_file_paths
-        .iter()
-        .map(|s| {
-            tt.add_template("temp", s).unwrap();
-            PathBuf::from(tt.render("temp", &context).unwrap())
-        })
-        .collect();
-    let input_file_paths: Vec<_> = config
-        .input_file_paths
-        .iter()
-        .map(|s| {
-            tt.add_template("temp", s).unwrap();
-            PathBuf::from(tt.render("temp", &context).unwrap())
-        })
-        .collect();
+    let bench_file_paths= materialise_paths(config.bench_file_paths, context);
+    let exec_file_paths = materialise_paths(config.exec_file_paths, context);
+    let test_input_file_paths = materialise_paths(config.test_input_file_paths, context);
+    let input_file_paths = materialise_paths(config.input_file_paths, context);
+    let readme_file_paths = materialise_paths(config.readme_file_paths, context);
+
     Ok(MaterialisedConfig {
         template,
         exec_file_paths,
@@ -153,23 +138,33 @@ fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
         bench_file_paths,
         input_file_paths,
         test_input_file_paths,
+        readme_file_paths,
     })
 }
 
-fn fetch_test_input(year: u32, day: u32) -> Result<String> {
-    let url = format!("https://adventofcode.com/{year}/day/{day}");
-    let client = reqwest::blocking::Client::new();
-    let cookie = std::env::var("AOC_COOKIE")?;
-    let request = client
-        .get(url)
-        .header("cookie", format!("session={cookie}"))
-        .build()?;
-    let html = client.execute(request)?.text()?;
-    largest_code_block(&html)
+fn fetch_readme(year: u32, day: u32, n: String) -> Result<String> {
+    let html = fetch_problem_page(year, day)?;
+    let re = regex::Regex::new(r"<main>(?s).*</main>").unwrap();
+    let main = re.find(&html).unwrap().as_str();
+    let problem_statement = html2md::parse_html(&main);
+
+    let mut tt = TinyTemplate::new();
+    tt.add_template("readme", README_TEMPLATE)?;
+    let context = Context {
+        problem_statement,
+        year,
+        day,
+        n,
+    };
+    let readme = tt.render("readme", &context).unwrap();
+    let re = regex::Regex::new(r"&#39;").unwrap();
+    let readme = re.replace_all(&readme, "'");
+    Ok(readme.into_owned())
 }
 
-fn largest_code_block(html: &str) -> Result<String> {
-    let fragment = Html::parse_fragment(html);
+fn fetch_test_input(year: u32, day: u32) -> Result<String> {
+    let html = fetch_problem_page(year, day)?;
+    let fragment = Html::parse_fragment(&html);
     let code_selector = Selector::parse("code").unwrap();
     let mut code_fragments: Vec<String> = fragment
         .select(&code_selector)
@@ -183,6 +178,17 @@ fn largest_code_block(html: &str) -> Result<String> {
         .ok_or_else(|| anyhow::anyhow!("No code blocks found"))
 }
 
+fn fetch_problem_page(year: u32, day: u32) -> Result<String> {
+    let url = format!("https://adventofcode.com/{year}/day/{day}");
+    let client = reqwest::blocking::Client::new();
+    let cookie = std::env::var("AOC_COOKIE")?;
+    let request = client
+        .get(url)
+        .header("cookie", format!("session={cookie}"))
+        .build()?;
+    Ok(client.execute(request)?.text()?)
+}
+
 fn fetch_real_input(year: u32, day: u32) -> Result<String> {
     let url = format!("https://adventofcode.com/{year}/day/{day}/input");
     let client = reqwest::blocking::Client::new();
@@ -192,4 +198,14 @@ fn fetch_real_input(year: u32, day: u32) -> Result<String> {
         .header("cookie", format!("session={cookie}"))
         .build()?;
     Ok(client.execute(request)?.text()?)
+}
+
+fn materialise_paths(input: Vec<String>, context: &Context) -> Vec<PathBuf> {
+    let mut result = vec![];
+    for path in input {
+        let mut tt = TinyTemplate::new();
+        tt.add_template("temp", &path).unwrap();
+        result.push(PathBuf::from(tt.render("temp", &context).unwrap()));
+    }
+    result
 }
