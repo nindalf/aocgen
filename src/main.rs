@@ -1,6 +1,7 @@
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use anyhow::Result;
+use chrono::Datelike;
 use clap::Parser;
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -32,11 +33,14 @@ struct Args {
     #[arg(short, long)]
     day: u32,
     /// Challenge year
-    #[arg(short, long, default_value_t = 2022)]
+    #[arg(short, long, default_value_t = 0)]
     year: u32,
     /// Config file
     #[arg(short, long, value_name = "FILE")]
     config: PathBuf,
+    
+    #[arg(value_enum, default_value_t=Language::Rust)]
+    language: Language,
 }
 
 #[derive(serde::Serialize, Debug)]
@@ -45,6 +49,14 @@ struct Context {
     day: u32,
     year: u32,
     problem_statement: String,
+    language: Language,
+}
+
+#[derive(Debug, Clone, clap::ValueEnum, serde::Serialize)]
+enum Language {
+    JS,
+    Python,
+    Rust,
 }
 
 static JS_TEMPLATE: &str = include_str!("../templates/js.tmpl");
@@ -53,14 +65,27 @@ static RUST_TEMPLATE: &str = include_str!("../templates/rust.tmpl");
 
 static README_TEMPLATE: &str = include_str!("../templates/readme.tmpl");
 
+static JS_CONFIG: &str = include_str!("../configs/js_config.json");
+static PYTHON_CONFIG: &str = include_str!("../configs/python_config.json");
+static RUST_CONFIG: &str = include_str!("../configs/rust_config.json");
+
 fn main() -> Result<()> {
     let args = Args::parse();
-    let n = format!("{:01$}", args.day, 2);
+    let n = format!("{}", args.day);
+    // Set year to current year if not provided
+    let year = if args.year == 0 {
+        let now = chrono::Utc::now();
+        now.year_ce().1
+    } else {
+        args.year
+    };
+
     let context = Context {
         n,
         day: args.day,
-        year: args.year,
+        year: year,
         problem_statement: "".to_owned(),
+        language: args.language,
     };
 
     let config = get_config(&context, args.config)?;
@@ -96,17 +121,25 @@ fn write_to_files(content: &str, paths: &[PathBuf]) -> Result<()> {
 }
 
 fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
-    let config_file = File::open(path)?;
-    let reader = BufReader::new(config_file);
-    let config: LangConfig = serde_json::from_reader(reader)?;
+    let config: LangConfig = if path.exists() {
+        let config_file = File::open(path)?;
+        let reader = BufReader::new(config_file);
+        serde_json::from_reader(reader)?
+    } else {
+        let config_str = match context.language {
+            Language::JS => JS_CONFIG,
+            Language::Python => PYTHON_CONFIG,
+            Language::Rust => RUST_CONFIG,
+        };
+        serde_json::from_str(config_str)?
+    };
 
     let mut tt = TinyTemplate::new();
 
-    let exec_file_template = match config.template_name.as_str() {
-        "js" => JS_TEMPLATE,
-        "python" => PYTHON_TEMPLATE,
-        "rust" => RUST_TEMPLATE,
-        _ => panic!("Unsupported template"),
+    let exec_file_template = match context.language {
+        Language::JS => JS_TEMPLATE,
+        Language::Python => PYTHON_TEMPLATE,
+        Language::Rust => RUST_TEMPLATE,
     };
     tt.add_template("exec_file", exec_file_template).unwrap();
     let template = tt.render("exec_file", &context).unwrap();
