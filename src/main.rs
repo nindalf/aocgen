@@ -198,7 +198,13 @@ fn fetch_problem_page(context: &Context) -> Result<String> {
     let day = context.day;
     let url = format!("https://adventofcode.com/{year}/day/{day}");
     let client = reqwest::blocking::Client::new();
-    let cookie = std::env::var("AOC_COOKIE")?;
+    let cookie = match std::env::var("AOC_COOKIE") {
+        Ok(cookie) => cookie,
+        Err(_) => {
+            eprintln!("AOC_COOKIE environment variable not set.\nFind the cookie value from your browser and set it as an environment variable.\nexport AOC_COOKIE=<cookie>");
+            std::process::exit(1);
+        }
+    };
     let request = client
         .get(url)
         .header("cookie", format!("session={cookie}"))
