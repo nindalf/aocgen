@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{fs::File, io::BufReader, path::PathBuf, borrow::Cow};
 
 use anyhow::Result;
 use clap::Parser;
@@ -156,10 +156,18 @@ fn fetch_readme(year: u32, day: u32, n: String) -> Result<String> {
         day,
         n,
     };
-    let readme = tt.render("readme", &context).unwrap();
-    let re = regex::Regex::new(r"&#39;").unwrap();
-    let readme = re.replace_all(&readme, "'");
-    Ok(readme.into_owned())
+
+    let mut readme = tt.render("readme", &context).unwrap();
+    let replacements = [
+        (r"&#39;", "'"),
+        (r"&gt;", ">"),
+        (r"&lt;", "<"),
+    ];
+    for (re, replacement) in replacements {
+        let re = regex::Regex::new(re).unwrap();
+        readme = re.replace_all(&readme, replacement).into_owned();
+    }
+    Ok(readme)
 }
 
 fn fetch_test_input(year: u32, day: u32) -> Result<String> {
