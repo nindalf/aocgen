@@ -37,7 +37,7 @@ struct Args {
     #[arg(short, long, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    #[arg(value_enum, default_value_t=Language::Rust)]
+    #[arg(short, long, value_enum, default_value_t=Language::Rust)]
     language: Language,
 }
 
