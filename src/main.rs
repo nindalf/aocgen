@@ -9,7 +9,6 @@ use tinytemplate::TinyTemplate;
 
 #[derive(Deserialize, Debug)]
 struct LangConfig {
-    template_name: String,
     exec_file_paths: Vec<String>,
     input_file_paths: Vec<String>,
     test_input_file_paths: Vec<String>,
@@ -38,12 +37,12 @@ struct Args {
     /// Config file
     #[arg(short, long, value_name = "FILE")]
     config: PathBuf,
-    
+
     #[arg(value_enum, default_value_t=Language::Rust)]
     language: Language,
 }
 
-#[derive(serde::Serialize, Debug)]
+#[derive(serde::Serialize, Debug, Clone)]
 struct Context {
     n: String,
     day: u32,
@@ -83,7 +82,7 @@ fn main() -> Result<()> {
     let context = Context {
         n,
         day: args.day,
-        year: year,
+        year,
         problem_statement: "".to_owned(),
         language: args.language,
     };
@@ -92,13 +91,13 @@ fn main() -> Result<()> {
 
     write_to_files(&config.template, &config.exec_file_paths)?;
 
-    let test_input = fetch_test_input(args.year, args.day)?;
+    let test_input = fetch_test_input(&context)?;
     write_to_files(&test_input, &config.test_input_file_paths)?;
 
-    let real_input = fetch_real_input(args.year, args.day)?;
+    let real_input = fetch_real_input(&context)?;
     write_to_files(&real_input, &config.input_file_paths)?;
 
-    let readme = fetch_readme(args.year, args.day, "".to_owned())?;
+    let readme = fetch_readme(&context)?;
     write_to_files(&readme, &config.readme_file_paths)?;
 
     Ok(())
@@ -158,27 +157,19 @@ fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
     })
 }
 
-fn fetch_readme(year: u32, day: u32, n: String) -> Result<String> {
-    let html = fetch_problem_page(year, day)?;
+fn fetch_readme(context: &Context) -> Result<String> {
+    let html = fetch_problem_page(context)?;
     let re = regex::Regex::new(r"<main>(?s).*</main>").unwrap();
     let main = re.find(&html).unwrap().as_str();
-    let problem_statement = html2md::parse_html(&main);
+    let problem_statement = html2md::parse_html(main);
 
     let mut tt = TinyTemplate::new();
     tt.add_template("readme", README_TEMPLATE)?;
-    let context = Context {
-        problem_statement,
-        year,
-        day,
-        n,
-    };
+    let mut context = context.clone();
+    context.problem_statement = problem_statement;
 
     let mut readme = tt.render("readme", &context).unwrap();
-    let replacements = [
-        (r"&#39;", "'"),
-        (r"&gt;", ">"),
-        (r"&lt;", "<"),
-    ];
+    let replacements = [(r"&#39;", "'"), (r"&gt;", ">"), (r"&lt;", "<")];
     for (re, replacement) in replacements {
         let re = regex::Regex::new(re).unwrap();
         readme = re.replace_all(&readme, replacement).into_owned();
@@ -186,8 +177,8 @@ fn fetch_readme(year: u32, day: u32, n: String) -> Result<String> {
     Ok(readme)
 }
 
-fn fetch_test_input(year: u32, day: u32) -> Result<String> {
-    let html = fetch_problem_page(year, day)?;
+fn fetch_test_input(context: &Context) -> Result<String> {
+    let html = fetch_problem_page(context)?;
     let fragment = Html::parse_fragment(&html);
     let code_selector = Selector::parse("code").unwrap();
     let mut code_fragments: Vec<String> = fragment
@@ -202,7 +193,9 @@ fn fetch_test_input(year: u32, day: u32) -> Result<String> {
         .ok_or_else(|| anyhow::anyhow!("No code blocks found"))
 }
 
-fn fetch_problem_page(year: u32, day: u32) -> Result<String> {
+fn fetch_problem_page(context: &Context) -> Result<String> {
+    let year = context.year;
+    let day = context.day;
     let url = format!("https://adventofcode.com/{year}/day/{day}");
     let client = reqwest::blocking::Client::new();
     let cookie = std::env::var("AOC_COOKIE")?;
@@ -213,7 +206,9 @@ fn fetch_problem_page(year: u32, day: u32) -> Result<String> {
     Ok(client.execute(request)?.text()?)
 }
 
-fn fetch_real_input(year: u32, day: u32) -> Result<String> {
+fn fetch_real_input(context: &Context) -> Result<String> {
+    let year = context.year;
+    let day = context.day;
     let url = format!("https://adventofcode.com/{year}/day/{day}/input");
     let client = reqwest::blocking::Client::new();
     let cookie = std::env::var("AOC_COOKIE")?;
