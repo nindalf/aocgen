@@ -1,7 +1,6 @@
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use anyhow::Result;
-use chrono::Datelike;
 use clap::Parser;
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -73,8 +72,8 @@ fn main() -> Result<()> {
     let n = format!("{}", args.day);
     // Set year to current year if not provided
     let year = if args.year == 0 {
-        let now = chrono::Utc::now();
-        now.year_ce().1
+        let now = jiff::Zoned::now();
+        now.year() as u32
     } else {
         args.year
     };
@@ -224,7 +223,8 @@ fn fetch_real_input(context: &Context) -> Result<String> {
         .build()?;
     let resp = client.execute(request)?.text()?;
     if resp.starts_with("Please don't repeatedly request this endpoint before it unlocks!") {
-        eprintln!("Input not available yet. Please wait until the challenge unlocks.");
+        let time = time_to_unlock(context)?;
+        eprintln!("Input not available yet. Please wait until the challenge unlocks in {}", time);
         std::process::exit(1);
     }
     Ok(resp)
@@ -238,4 +238,13 @@ fn materialise_paths(input: Vec<String>, context: &Context) -> Vec<PathBuf> {
         result.push(PathBuf::from(tt.render("temp", &context).unwrap()));
     }
     result
+}
+
+fn time_to_unlock(context: &Context) -> Result<jiff::SignedDuration> {
+    let unlock_time = jiff::civil::date(context.year as i16, 12, context.day as i8)
+        .at(5, 00, 0, 0)
+        .intz("UTC")?;
+    let now = jiff::Zoned::now();
+
+    Ok(now.duration_until(&unlock_time))
 }

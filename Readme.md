@@ -29,8 +29,8 @@ export AOC_COOKIE=5361...
  
  ## Each day
 
-To generate scaffolding and fetch the day's input
+To generate each day's scaffolding and fetch that day's input
 
 ```
-aocgen --day 1 --year 2022 # run each day
+aocgen --day 2 # run each day
 ```
