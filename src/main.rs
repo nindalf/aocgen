@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufReader, path::PathBuf, borrow::Cow};
+use std::{fs::File, io::BufReader, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
@@ -12,7 +12,6 @@ struct LangConfig {
     exec_file_paths: Vec<String>,
     input_file_paths: Vec<String>,
     test_input_file_paths: Vec<String>,
-    bench_file_paths: Vec<String>,
     readme_file_paths: Vec<String>,
 }
 
@@ -20,8 +19,6 @@ struct LangConfig {
 struct MaterialisedConfig {
     template: String,
     exec_file_paths: Vec<PathBuf>,
-    bench_template: String,
-    bench_file_paths: Vec<PathBuf>,
     input_file_paths: Vec<PathBuf>,
     test_input_file_paths: Vec<PathBuf>,
     readme_file_paths: Vec<PathBuf>,
@@ -54,8 +51,6 @@ static JS_TEMPLATE: &str = include_str!("../templates/js.tmpl");
 static PYTHON_TEMPLATE: &str = include_str!("../templates/python.tmpl");
 static RUST_TEMPLATE: &str = include_str!("../templates/rust.tmpl");
 
-static RUST_BENCH_TEMPLATE: &str = include_str!("../templates/rust_bench.tmpl");
-
 static README_TEMPLATE: &str = include_str!("../templates/readme.tmpl");
 
 fn main() -> Result<()> {
@@ -71,8 +66,6 @@ fn main() -> Result<()> {
     let config = get_config(&context, args.config)?;
 
     write_to_files(&config.template, &config.exec_file_paths)?;
-
-    write_to_files(&config.bench_template, &config.bench_file_paths)?;
 
     let test_input = fetch_test_input(args.year, args.day)?;
     write_to_files(&test_input, &config.test_input_file_paths)?;
@@ -118,14 +111,6 @@ fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
     tt.add_template("exec_file", exec_file_template).unwrap();
     let template = tt.render("exec_file", &context).unwrap();
 
-    let bench_file_template = match config.template_name.as_str() {
-        "rust" => RUST_BENCH_TEMPLATE,
-        _ => panic!("Unsupported template"),
-    };
-    tt.add_template("bench_file", bench_file_template).unwrap();
-    let bench_template = tt.render("bench_file", &context).unwrap();
-
-    let bench_file_paths= materialise_paths(config.bench_file_paths, context);
     let exec_file_paths = materialise_paths(config.exec_file_paths, context);
     let test_input_file_paths = materialise_paths(config.test_input_file_paths, context);
     let input_file_paths = materialise_paths(config.input_file_paths, context);
@@ -134,8 +119,6 @@ fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
     Ok(MaterialisedConfig {
         template,
         exec_file_paths,
-        bench_template,
-        bench_file_paths,
         input_file_paths,
         test_input_file_paths,
         readme_file_paths,
