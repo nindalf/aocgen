@@ -36,7 +36,7 @@ struct Args {
     year: u32,
     /// Config file
     #[arg(short, long, value_name = "FILE")]
-    config: PathBuf,
+    config: Option<PathBuf>,
 
     #[arg(value_enum, default_value_t=Language::Rust)]
     language: Language,
@@ -119,8 +119,8 @@ fn write_to_files(content: &str, paths: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
-fn get_config(context: &Context, path: PathBuf) -> Result<MaterialisedConfig> {
-    let config: LangConfig = if path.exists() {
+fn get_config(context: &Context, path: Option<PathBuf>) -> Result<MaterialisedConfig> {
+    let config: LangConfig = if let Some(path) = path {
         let config_file = File::open(path)?;
         let reader = BufReader::new(config_file);
         serde_json::from_reader(reader)?
