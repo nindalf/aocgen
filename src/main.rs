@@ -89,16 +89,16 @@ fn main() -> Result<()> {
 
     let config = get_config(&context, args.config)?;
 
-    write_to_files(&config.template, &config.exec_file_paths)?;
+    let real_input = fetch_real_input(&context)?;
+    write_to_files(&real_input, &config.input_file_paths)?;
 
     let test_input = fetch_test_input(&context)?;
     write_to_files(&test_input, &config.test_input_file_paths)?;
 
-    let real_input = fetch_real_input(&context)?;
-    write_to_files(&real_input, &config.input_file_paths)?;
-
     let readme = fetch_readme(&context)?;
     write_to_files(&readme, &config.readme_file_paths)?;
+
+    write_to_files(&config.template, &config.exec_file_paths)?;
 
     Ok(())
 }
@@ -222,7 +222,12 @@ fn fetch_real_input(context: &Context) -> Result<String> {
         .get(url)
         .header("cookie", format!("session={cookie}"))
         .build()?;
-    Ok(client.execute(request)?.text()?)
+    let resp = client.execute(request)?.text()?;
+    if resp.starts_with("Please don't repeatedly request this endpoint before it unlocks!") {
+        eprintln!("Input not available yet. Please wait until the challenge unlocks.");
+        std::process::exit(1);
+    }
+    Ok(resp)
 }
 
 fn materialise_paths(input: Vec<String>, context: &Context) -> Vec<PathBuf> {
