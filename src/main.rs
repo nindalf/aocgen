@@ -168,7 +168,13 @@ fn fetch_readme(context: &Context) -> Result<String> {
     context.problem_statement = problem_statement;
 
     let mut readme = tt.render("readme", &context).unwrap();
-    let replacements = [(r"&#39;", "'"), (r"&gt;", ">"), (r"&lt;", "<")];
+    let replacements = [
+        (r"&#39;", "'"),
+        (r"&gt;", ">"),
+        (r"&lt;", "<"),
+        (r"&quot;", "\""),
+        (r"You can .*Mastodon.* this puzzle.\n", ""),
+    ];
     for (re, replacement) in replacements {
         let re = regex::Regex::new(re).unwrap();
         readme = re.replace_all(&readme, replacement).into_owned();
@@ -224,7 +230,10 @@ fn fetch_real_input(context: &Context) -> Result<String> {
     let resp = client.execute(request)?.text()?;
     if resp.starts_with("Please don't repeatedly request this endpoint before it unlocks!") {
         let time = time_to_unlock(context)?;
-        eprintln!("Input not available yet. Please wait until the challenge unlocks in {}", time);
+        eprintln!(
+            "Input not available yet. Please wait until the challenge unlocks in {}",
+            time
+        );
         std::process::exit(1);
     }
     Ok(resp)
