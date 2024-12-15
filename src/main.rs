@@ -1,39 +1,63 @@
 mod fetch;
 mod submit;
 
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Parser;
-use scraper::{Html, Selector};
-use serde::Deserialize;
-use tinytemplate::TinyTemplate;
+use clap::{Parser, Subcommand};
 
 /// Generate the Rust file for that day's Advent of Code challenge
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Fetch puzzle input and description
+    Fetch(FetchArgs),
+    /// Submit puzzle solution
+    Submit(SubmitArgs),
+}
+
+#[derive(Parser, Debug)]
+pub(crate) struct FetchArgs {
     /// Day (1-25) of the advent calendar
     #[arg(short, long)]
     day: u32,
+
     /// Challenge year
     #[arg(short, long, default_value_t = 0)]
     year: u32,
-    /// Config file
-    #[arg(short, long, value_name = "FILE")]
-    config: Option<PathBuf>,
 
-    #[arg(short, long, value_enum, default_value_t=Language::Rust)]
+    #[arg(short, long, value_enum, default_value_t = Language::Rust)]
     language: Language,
+
+    /// Config file
+    #[arg(short, long, value_name = "FILE", global = true)]
+    config: Option<PathBuf>,
 }
 
-#[derive(serde::Serialize, Debug, Clone)]
-struct Context {
-    n: String,
+#[derive(Parser, Debug)]
+pub(crate) struct SubmitArgs {
+    /// Day (1-25) of the advent calendar
+    #[arg(short, long)]
     day: u32,
+
+    /// Challenge year
+    #[arg(short, long, default_value_t = 0)]
     year: u32,
-    problem_statement: String,
-    language: Language,
+
+    /// Solution part number (1 or 2)
+    #[arg(short, long)]
+    part: u32,
+
+    /// Solution answer
+    #[arg(short, long)]
+    answer: String,
 }
 
 #[derive(Debug, Clone, clap::ValueEnum, serde::Serialize)]
@@ -45,24 +69,10 @@ pub(crate) enum Language {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let n = format!("{}", args.day);
-    // Set year to current year if not provided
-    let year = if args.year == 0 {
-        let now = jiff::Zoned::now();
-        now.year() as u32
-    } else {
-        args.year
-    };
-
-    let context = Context {
-        n,
-        day: args.day,
-        year,
-        problem_statement: "".to_owned(),
-        language: args.language,
-    };
-
-    fetch::fetch_and_write(&context);
+    match args.command {
+        Commands::Fetch(fetch_args) => fetch::fetch_and_write(fetch_args),
+        Commands::Submit(submit_args) => submit::submit_answer(submit_args),
+    }?;
 
     Ok(())
 }

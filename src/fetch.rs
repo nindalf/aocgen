@@ -1,7 +1,6 @@
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use anyhow::Result;
-use clap::Parser;
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use tinytemplate::TinyTemplate;
@@ -18,6 +17,14 @@ static JS_CONFIG: &str = include_str!("../configs/js_config.json");
 static PYTHON_CONFIG: &str = include_str!("../configs/python_config.json");
 static RUST_CONFIG: &str = include_str!("../configs/rust_config.json");
 
+#[derive(serde::Serialize, Debug, Clone)]
+struct FetchContext {
+    n: String,
+    day: u32,
+    year: u32,
+    problem_statement: String,
+    language: Language,
+}
 
 #[derive(Deserialize, Debug)]
 struct LangConfig {
@@ -36,8 +43,24 @@ struct MaterialisedConfig {
     readme_file_paths: Vec<PathBuf>,
 }
 
+pub(crate) fn fetch_and_write(args: crate::FetchArgs) -> Result<()> {
+    let n = format!("{}", args.day);
+    // Set year to current year if not provided
+    let year = if args.year == 0 {
+        let now = jiff::Zoned::now();
+        now.year() as u32
+    } else {
+        args.year
+    };
 
-pub(crate) fn fetch_and_write(context: &crate::Context) -> Result<()> {
+    let context = FetchContext {
+        n,
+        day: args.day,
+        year,
+        problem_statement: "".to_owned(),
+        language: args.language,
+    };
+
     let config = get_config(&context, args.config)?;
 
     let real_input = fetch_real_input(&context)?;
@@ -70,7 +93,7 @@ fn write_to_files(content: &str, paths: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
-fn get_config(context: &crate::Context, path: Option<PathBuf>) -> Result<MaterialisedConfig> {
+fn get_config(context: &FetchContext, path: Option<PathBuf>) -> Result<MaterialisedConfig> {
     let config: LangConfig = if let Some(path) = path {
         let config_file = File::open(path)?;
         let reader = BufReader::new(config_file);
@@ -108,7 +131,7 @@ fn get_config(context: &crate::Context, path: Option<PathBuf>) -> Result<Materia
     })
 }
 
-fn fetch_readme(context: &crate::Context) -> Result<String> {
+fn fetch_readme(context: &FetchContext) -> Result<String> {
     let html = fetch_problem_page(context)?;
     let re = regex::Regex::new(r"<main>(?s).*</main>").unwrap();
     let main = re.find(&html).unwrap().as_str();
@@ -134,7 +157,7 @@ fn fetch_readme(context: &crate::Context) -> Result<String> {
     Ok(readme)
 }
 
-fn fetch_test_input(context: &crate::Context) -> Result<String> {
+fn fetch_test_input(context: &FetchContext) -> Result<String> {
     let html = fetch_problem_page(context)?;
     let fragment = Html::parse_fragment(&html);
     let code_selector = Selector::parse("code").unwrap();
@@ -150,7 +173,7 @@ fn fetch_test_input(context: &crate::Context) -> Result<String> {
         .ok_or_else(|| anyhow::anyhow!("No code blocks found"))
 }
 
-fn fetch_problem_page(context: &crate::Context) -> Result<String> {
+fn fetch_problem_page(context: &FetchContext) -> Result<String> {
     let year = context.year;
     let day = context.day;
     let url = format!("https://adventofcode.com/{year}/day/{day}");
@@ -169,7 +192,7 @@ fn fetch_problem_page(context: &crate::Context) -> Result<String> {
     Ok(client.execute(request)?.text()?)
 }
 
-fn fetch_real_input(context: &crate::Context) -> Result<String> {
+fn fetch_real_input(context: &FetchContext) -> Result<String> {
     let year = context.year;
     let day = context.day;
     let url = format!("https://adventofcode.com/{year}/day/{day}/input");
@@ -191,7 +214,7 @@ fn fetch_real_input(context: &crate::Context) -> Result<String> {
     Ok(resp)
 }
 
-fn materialise_paths(input: Vec<String>, context: &crate::Context) -> Vec<PathBuf> {
+fn materialise_paths(input: Vec<String>, context: &FetchContext) -> Vec<PathBuf> {
     let mut result = vec![];
     for path in input {
         let mut tt = TinyTemplate::new();
@@ -201,7 +224,7 @@ fn materialise_paths(input: Vec<String>, context: &crate::Context) -> Vec<PathBu
     result
 }
 
-fn time_to_unlock(context: &crate::Context) -> Result<jiff::SignedDuration> {
+fn time_to_unlock(context: &FetchContext) -> Result<jiff::SignedDuration> {
     let unlock_time = jiff::civil::date(context.year as i16, 12, context.day as i8)
         .at(5, 00, 0, 0)
         .intz("UTC")?;
