@@ -53,7 +53,7 @@ pub(crate) struct SubmitArgs {
 
     /// Solution part number (1 or 2)
     #[arg(short, long)]
-    part: u32,
+    part: String,
 
     /// Solution answer
     #[arg(short, long)]
@@ -69,9 +69,13 @@ pub(crate) enum Language {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    let now = jiff::Zoned::now();
+    let default_year = now.year() as u32;
+
     match args.command {
-        Commands::Fetch(fetch_args) => fetch::fetch_and_write(fetch_args),
-        Commands::Submit(submit_args) => submit::submit_answer(submit_args),
+        Commands::Fetch(fetch_args) => fetch::fetch_and_write(fetch_args, default_year),
+        Commands::Submit(submit_args) => submit::submit_answer(submit_args, default_year),
     }?;
 
     Ok(())

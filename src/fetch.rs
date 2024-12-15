@@ -19,7 +19,6 @@ static RUST_CONFIG: &str = include_str!("../configs/rust_config.json");
 
 #[derive(serde::Serialize, Debug, Clone)]
 struct FetchContext {
-    n: String,
     day: u32,
     year: u32,
     problem_statement: String,
@@ -43,18 +42,15 @@ struct MaterialisedConfig {
     readme_file_paths: Vec<PathBuf>,
 }
 
-pub(crate) fn fetch_and_write(args: crate::FetchArgs) -> Result<()> {
-    let n = format!("{}", args.day);
+pub(crate) fn fetch_and_write(args: crate::FetchArgs, default_year: u32) -> Result<()> {
     // Set year to current year if not provided
     let year = if args.year == 0 {
-        let now = jiff::Zoned::now();
-        now.year() as u32
+        default_year
     } else {
         args.year
     };
 
     let context = FetchContext {
-        n,
         day: args.day,
         year,
         problem_statement: "".to_owned(),
