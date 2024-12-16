@@ -64,14 +64,3 @@ pub(crate) fn clean_response(mut response: String) -> anyhow::Result<String> {
     }
     Ok(response)
 }
-
-mod tests {
-    #[test]
-    fn test_replacement() -> anyhow::Result<()> {
-        let request = super::Request::ProblemPage(2024, 16);
-        let resp = super::execute(request)?;
-        // println!("{resp}");
-
-        Ok(())
-    }
-}
