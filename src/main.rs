@@ -1,5 +1,7 @@
+mod client;
 mod fetch;
 mod submit;
+mod time;
 
 use std::path::PathBuf;
 
@@ -26,7 +28,7 @@ enum Commands {
 #[derive(Parser, Debug)]
 pub(crate) struct FetchArgs {
     /// Day (1-25) of the advent calendar
-    #[arg(short, long)]
+    #[arg(short, long, value_parser=clap::value_parser!(u32).range(1..=25))]
     day: u32,
 
     /// Challenge year
@@ -44,7 +46,7 @@ pub(crate) struct FetchArgs {
 #[derive(Parser, Debug)]
 pub(crate) struct SubmitArgs {
     /// Day (1-25) of the advent calendar
-    #[arg(short, long)]
+    #[arg(short, long, value_parser=clap::value_parser!(u32).range(1..=25))]
     day: u32,
 
     /// Challenge year
@@ -70,12 +72,9 @@ pub(crate) enum Language {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let now = jiff::Zoned::now();
-    let default_year = now.year() as u32;
-
     match args.command {
-        Commands::Fetch(fetch_args) => fetch::fetch_and_write(fetch_args, default_year),
-        Commands::Submit(submit_args) => submit::submit_answer(submit_args, default_year),
+        Commands::Fetch(fetch_args) => fetch::fetch_and_write(fetch_args),
+        Commands::Submit(submit_args) => submit::submit_answer(submit_args),
     }?;
 
     Ok(())

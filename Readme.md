@@ -32,5 +32,11 @@ export AOC_COOKIE=5361...
 To generate each day's scaffolding and fetch that day's input
 
 ```
-aocgen --day 2 # run each day
+aocgen fetch --day 2 # run each day
+```
+
+And when you're ready with the answer
+
+```
+aocgen submit --day 2 --part 1 --answer 1024
 ```

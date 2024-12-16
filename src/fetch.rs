@@ -1,11 +1,10 @@
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use anyhow::Result;
-use scraper::{Html, Selector};
 use serde::Deserialize;
 use tinytemplate::TinyTemplate;
 
-use crate::Language;
+use crate::{client, time, Language};
 
 static JS_TEMPLATE: &str = include_str!("../templates/js.tmpl");
 static PYTHON_TEMPLATE: &str = include_str!("../templates/python.tmpl");
@@ -19,6 +18,7 @@ static RUST_CONFIG: &str = include_str!("../configs/rust_config.json");
 
 #[derive(serde::Serialize, Debug, Clone)]
 struct FetchContext {
+    n: String,
     day: u32,
     year: u32,
     problem_statement: String,
@@ -42,15 +42,13 @@ struct MaterialisedConfig {
     readme_file_paths: Vec<PathBuf>,
 }
 
-pub(crate) fn fetch_and_write(args: crate::FetchArgs, default_year: u32) -> Result<()> {
+pub(crate) fn fetch_and_write(args: crate::FetchArgs) -> Result<()> {
     // Set year to current year if not provided
-    let year = if args.year == 0 {
-        default_year
-    } else {
-        args.year
-    };
+    let year = time::validate_year(args.year)?;
+    time::exit_if_problem_locked(year, args.day)?;
 
     let context = FetchContext {
+        n: args.day.to_string(),
         day: args.day,
         year,
         problem_statement: "".to_owned(),
@@ -62,11 +60,11 @@ pub(crate) fn fetch_and_write(args: crate::FetchArgs, default_year: u32) -> Resu
     let real_input = fetch_real_input(&context)?;
     write_to_files(&real_input, &config.input_file_paths)?;
 
-    let test_input = fetch_test_input(&context)?;
-    write_to_files(&test_input, &config.test_input_file_paths)?;
-
     let readme = fetch_readme(&context)?;
     write_to_files(&readme, &config.readme_file_paths)?;
+
+    let test_input = guess_test_input(&readme)?;
+    write_to_files(test_input, &config.test_input_file_paths)?;
 
     write_to_files(&config.template, &config.exec_file_paths)?;
 
@@ -127,87 +125,31 @@ fn get_config(context: &FetchContext, path: Option<PathBuf>) -> Result<Materiali
     })
 }
 
+fn fetch_real_input(context: &FetchContext) -> Result<String> {
+    let real_input_request = client::Request::Input(context.year, context.day);
+    client::execute(real_input_request)
+}
+
 fn fetch_readme(context: &FetchContext) -> Result<String> {
-    let html = fetch_problem_page(context)?;
-    let re = regex::Regex::new(r"<main>(?s).*</main>").unwrap();
-    let main = re.find(&html).unwrap().as_str();
-    let problem_statement = html2md::parse_html(main);
+    let request = crate::client::Request::ProblemPage(context.year, context.day);
+    let problem_statement = crate::client::execute(request)?;
 
     let mut tt = TinyTemplate::new();
     tt.add_template("readme", README_TEMPLATE)?;
     let mut context = context.clone();
     context.problem_statement = problem_statement;
 
-    let mut readme = tt.render("readme", &context).unwrap();
-    let replacements = [
-        (r"&#39;", "'"),
-        (r"&gt;", ">"),
-        (r"&lt;", "<"),
-        (r"&quot;", "\""),
-        (r"You can .*Mastodon.* this puzzle.\n", ""),
-    ];
-    for (re, replacement) in replacements {
-        let re = regex::Regex::new(re).unwrap();
-        readme = re.replace_all(&readme, replacement).into_owned();
-    }
-    Ok(readme)
+    let rendered = tt.render("readme", &context)?;
+    let cleaned = client::clean_response(rendered)?;
+
+    Ok(cleaned)
 }
 
-fn fetch_test_input(context: &FetchContext) -> Result<String> {
-    let html = fetch_problem_page(context)?;
-    let fragment = Html::parse_fragment(&html);
-    let code_selector = Selector::parse("code").unwrap();
-    let mut code_fragments: Vec<String> = fragment
-        .select(&code_selector)
-        .filter_map(|element| element.first_child())
-        .filter_map(|child| child.value().as_text())
-        .map(|text| text.to_string())
-        .collect();
-    code_fragments.sort_by_key(|a| a.len());
-    code_fragments
-        .pop()
-        .ok_or_else(|| anyhow::anyhow!("No code blocks found"))
-}
-
-fn fetch_problem_page(context: &FetchContext) -> Result<String> {
-    let year = context.year;
-    let day = context.day;
-    let url = format!("https://adventofcode.com/{year}/day/{day}");
-    let client = reqwest::blocking::Client::new();
-    let cookie = match std::env::var("AOC_COOKIE") {
-        Ok(cookie) => cookie,
-        Err(_) => {
-            eprintln!("AOC_COOKIE environment variable not set.\nFind the cookie value from your browser and set it as an environment variable.\nexport AOC_COOKIE=<cookie>");
-            std::process::exit(1);
-        }
-    };
-    let request = client
-        .get(url)
-        .header("cookie", format!("session={cookie}"))
-        .build()?;
-    Ok(client.execute(request)?.text()?)
-}
-
-fn fetch_real_input(context: &FetchContext) -> Result<String> {
-    let year = context.year;
-    let day = context.day;
-    let url = format!("https://adventofcode.com/{year}/day/{day}/input");
-    let client = reqwest::blocking::Client::new();
-    let cookie = std::env::var("AOC_COOKIE")?;
-    let request = client
-        .get(url)
-        .header("cookie", format!("session={cookie}"))
-        .build()?;
-    let resp = client.execute(request)?.text()?;
-    if resp.starts_with("Please don't repeatedly request this endpoint before it unlocks!") {
-        let time = time_to_unlock(context)?;
-        eprintln!(
-            "Input not available yet. Please wait until the challenge unlocks in {}",
-            time
-        );
-        std::process::exit(1);
-    }
-    Ok(resp)
+fn guess_test_input(readme: &str) -> Result<&str> {
+    let re = regex::Regex::new(r"```[\s\S]*?```")?;
+    let mut code_blocks: Vec<&str> = re.find_iter(readme).map(|s| s.as_str()).collect();
+    code_blocks.sort_by_key(|a| a.len());
+    Ok(code_blocks[code_blocks.len() - 1])
 }
 
 fn materialise_paths(input: Vec<String>, context: &FetchContext) -> Vec<PathBuf> {
@@ -218,13 +160,4 @@ fn materialise_paths(input: Vec<String>, context: &FetchContext) -> Vec<PathBuf>
         result.push(PathBuf::from(tt.render("temp", &context).unwrap()));
     }
     result
-}
-
-fn time_to_unlock(context: &FetchContext) -> Result<jiff::SignedDuration> {
-    let unlock_time = jiff::civil::date(context.year as i16, 12, context.day as i8)
-        .at(5, 00, 0, 0)
-        .intz("UTC")?;
-    let now = jiff::Zoned::now();
-
-    Ok(now.duration_until(&unlock_time))
 }
