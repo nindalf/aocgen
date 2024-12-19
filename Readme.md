@@ -1,27 +1,25 @@
 # Advent of Code Generator
 
-This program generates scaffolding for the day's solutions - `dayN.rs`.
+`aocgen` is a flexible helper program that makes it easier to work with adventofcode.com.
 
-It also fetches that day's input once your `AOC_COOKIE` is set.
+1. `fetch` the day's problem.
+   - Guess the day's test input from the problem text.
+   - Fetch the day's full input specific to your account.
+   - Store these in local files text files.
+   - Create a scaffold according to the language specified - `day2.rs`, `day2.js` etc.
+2. `submit` the answer
 
 ## One time setup 
 
-Install `aocgen` and add it to `PATH`
+Install `aocgen` :
 
 ```
-git clone https://github.com/nindalf/aocgen.git
-cd aocgen
-cargo install --path .
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/nindalf/aocgen/releases/latest/download/aocgen-installer.sh | sh
 ```
 
-Set up a new project
+Set env variable with the adventofcode.com session cookie. This allows `aocgen` to fetch each day's test input and submit the answer. 
 
-```
-cargo new advent-2022     # create new project
-cd advent-2022/
-```
-
-Set env variable with the adventofcode.com session cookie. This allows `aocgen` to fetch each day's test input. This can be fetched from dev tools after logging in on the website.
+Open adventofcode.com and check the Cookies tab in Developer Tools for the `session` cookie.
 
 ```
 export AOC_COOKIE=5361...
@@ -40,3 +38,11 @@ And when you're ready with the answer
 ```
 aocgen submit --day 2 --part 1 --answer 1024
 ```
+
+## Customising `fetch`
+
+The default language chosen by `aocgen fetch` is Rust, but this can be changed with the `--language` option.
+
+If you'd like to change the paths where the input, problem and solution files are stored, change the file in `configs`.
+
+If you'd like to change the language template in `templates` it will need a recompile.
