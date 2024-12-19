@@ -56,11 +56,34 @@ pub(crate) fn clean_response(mut response: String) -> anyhow::Result<String> {
         (r"&lt;", "<"),
         (r"&quot;", "\""),
         (r"You can .*Mastodon.* this puzzle.\n", ""),
-        (r"You can .*Mastodon.*\n", ""),
+        (r" ?You can .*Mastodon.*this victory or ", "\n"),
     ];
     for (re, replacement) in replacements {
         let re = regex::Regex::new(re)?;
         response = re.replace_all(&response, replacement).into_owned();
     }
     Ok(response)
+}
+
+mod tests {
+    #[test]
+    fn test_clean_response() {
+        let cases = [
+            (
+                "That's the right answer! You are one gold star closer to finding the Chief Historian.\n\nYou have completed Day 19! You can [Shareon [Bluesky](https://bsky.app/intent/compose?text=I+just+completed+%22Linen+Layout%22+%2D+Day+19+%2D+Advent+of+Code+2024+%23AdventOfCode+https%3A%2F%2Fadventofcode%2Ecom%2F2024%2Fday%2F19) [Twitter](https://twitter.com/intent/tweet?text=I+just+completed+%22Linen+Layout%22+%2D+Day+19+%2D+Advent+of+Code+2024&url=https%3A%2F%2Fadventofcode%2Ecom%2F2024%2Fday%2F19&related=ericwastl&hashtags=AdventOfCode) [Mastodon](javascript:void(0);)] this victory or [[Return to Your Advent Calendar]](/2024).",
+                "That's the right answer! You are one gold star closer to finding the Chief Historian.\n\nYou have completed Day 19!\n[[Return to Your Advent Calendar]](/2024)."
+            ),
+            (
+                "&#39; &gt; &lt; &quot;",
+                "' > < \"",
+            ),
+            (
+                "&quot;air quotes&quot;",
+                "\"air quotes\"",
+            ),
+        ];
+        for (input, output) in cases {
+            assert_eq!(output, &super::clean_response(input.to_owned()).unwrap());
+        }
+    }
 }
