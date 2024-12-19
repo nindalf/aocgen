@@ -146,9 +146,19 @@ fn fetch_readme(context: &FetchContext) -> Result<String> {
 }
 
 fn guess_test_input(readme: &str) -> Result<&str> {
-    let re = regex::Regex::new(r"```[\s\S]*?```")?;
-    let mut code_blocks: Vec<&str> = re.find_iter(readme).map(|s| s.as_str()).collect();
+    let re = regex::Regex::new(r"```\n([\s\S]*?)\n```")?;
+    let mut code_blocks: Vec<&str> = re
+        .captures_iter(readme)
+        .filter_map(|s| s.get(1))
+        .map(|s| s.as_str())
+        .collect();
+
     code_blocks.sort_by_key(|a| a.len());
+
+    if code_blocks.is_empty() {
+        return Ok("");
+    }
+
     Ok(code_blocks[code_blocks.len() - 1])
 }
 
