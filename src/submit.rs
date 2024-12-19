@@ -20,7 +20,7 @@ pub(crate) fn submit_answer(args: crate::SubmitArgs) -> anyhow::Result<()> {
 }
 
 fn validate_part(part: &str) -> anyhow::Result<&str> {
-    if part == "1" && part == "2" {
+    if part == "1" || part == "2" {
         return Ok(part);
     }
     anyhow::bail!("You must choose part 1 or part 2")
