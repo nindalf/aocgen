@@ -57,6 +57,8 @@ pub(crate) fn clean_response(mut response: String) -> anyhow::Result<String> {
         (r"&quot;", "\""),
         (r"You can .*Mastodon.* this puzzle.\n", ""),
         (r" ?You can .*Mastodon.*this victory or ", "\n"),
+        (r"article \\\*.*\n\n", ""),
+        (r"(\[.*?\])\(/(.*?)\)","$1(https://adventofcode.com/$2)"),
     ];
     for (re, replacement) in replacements {
         let re = regex::Regex::new(re)?;
