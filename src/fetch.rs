@@ -45,7 +45,7 @@ struct MaterialisedConfig {
 pub(crate) fn fetch_and_write(args: crate::FetchArgs) -> Result<()> {
     // Set year to current year if not provided
     let year = time::validate_year(args.year)?;
-    time::exit_if_problem_locked(year, args.day)?;
+    time::error_if_problem_locked(year, args.day)?;
 
     let context = FetchContext {
         n: args.day.to_string(),
