@@ -7,7 +7,7 @@ pub(crate) fn submit_answer(args: crate::SubmitArgs) -> anyhow::Result<()> {
     let year = time::validate_year(args.year)?;
     let day = args.day;
 
-    time::exit_if_problem_locked(year, day)?;
+    time::error_if_problem_locked(year, day)?;
 
     let part = validate_part(&args.part)?;
     let form = [("level", part), ("answer", &args.answer)];

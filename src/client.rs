@@ -58,7 +58,7 @@ pub(crate) fn clean_response(mut response: String) -> anyhow::Result<String> {
         (r"You can .*Mastodon.* this puzzle.\n", ""),
         (r" ?You can .*Mastodon.*this victory or ", "\n"),
         (r"article \\\*.*\n\n", ""),
-        (r"(\[.*?\])\(/(.*?)\)","$1(https://adventofcode.com/$2)"),
+        (r"(\[.*?\])\(/(.*?)\)", "$1(https://adventofcode.com/$2)"),
     ];
     for (re, replacement) in replacements {
         let re = regex::Regex::new(re)?;
@@ -73,7 +73,7 @@ mod tests {
         let cases = [
             (
                 "That's the right answer! You are one gold star closer to finding the Chief Historian.\n\nYou have completed Day 19! You can [Shareon [Bluesky](https://bsky.app/intent/compose?text=I+just+completed+%22Linen+Layout%22+%2D+Day+19+%2D+Advent+of+Code+2024+%23AdventOfCode+https%3A%2F%2Fadventofcode%2Ecom%2F2024%2Fday%2F19) [Twitter](https://twitter.com/intent/tweet?text=I+just+completed+%22Linen+Layout%22+%2D+Day+19+%2D+Advent+of+Code+2024&url=https%3A%2F%2Fadventofcode%2Ecom%2F2024%2Fday%2F19&related=ericwastl&hashtags=AdventOfCode) [Mastodon](javascript:void(0);)] this victory or [[Return to Your Advent Calendar]](/2024).",
-                "That's the right answer! You are one gold star closer to finding the Chief Historian.\n\nYou have completed Day 19!\n[[Return to Your Advent Calendar]](/2024)."
+                "That's the right answer! You are one gold star closer to finding the Chief Historian.\n\nYou have completed Day 19!\n[[Return to Your Advent Calendar]](https://adventofcode.com/2024)."
             ),
             (
                 "&#39; &gt; &lt; &quot;",
