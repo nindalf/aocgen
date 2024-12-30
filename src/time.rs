@@ -1,4 +1,4 @@
-use jiff::Zoned;
+use jiff::{RoundMode, SpanRound, Unit, Zoned};
 
 pub(crate) fn validate_year(year: u32) -> anyhow::Result<u32> {
     let current_year = current_year();
@@ -20,6 +20,8 @@ pub(crate) fn error_if_problem_locked(year: u32, day: u32) -> anyhow::Result<()>
     error_if_time_before_problem_unlock(Zoned::now(), year, day)
 }
 
+// If it hasn't unlocked will return an error with the ceiling of the time remaining.
+// If there is 0.000001 seconds remaining it will recommend "Try again in 1s"
 fn error_if_time_before_problem_unlock(
     time: jiff::Zoned,
     year: u32,
@@ -29,11 +31,13 @@ fn error_if_time_before_problem_unlock(
         .at(5, 00, 0, 0)
         .intz("UTC")?;
 
-    let time_until_unlock = time.duration_until(&unlock_time);
+    let time_until_unlock = time.until(&unlock_time)?.round(
+        SpanRound::new()
+            .smallest(Unit::Second)
+            .mode(RoundMode::Ceil),
+    )?;
     if time_until_unlock.is_positive() {
-        let friendly_time = time_until_unlock
-            - jiff::SignedDuration::from_nanos(time_until_unlock.subsec_nanos() as i64);
-        anyhow::bail!("Problem hasn't unlocked yet. Try again in {friendly_time:#}",)
+        anyhow::bail!("Problem hasn't unlocked yet. Try again in {time_until_unlock:#}")
     }
 
     Ok(())
@@ -45,15 +49,15 @@ mod tests {
         let test_cases = [
             (
                 "2024-11-30T16:27:29.999999999-08:00[America/Los_Angeles]",
-                "4h 32m 30s",
+                "4h 32m 31s",
             ),
             (
-                "2024-11-29T16:27:29.999999999-05:00[America/New_York]",
-                "31h 32m 30s",
+                "2024-11-29T16:27:29.1-05:00[America/New_York]",
+                "31h 32m 31s",
             ),
-            ("2024-12-01T04:59:58.999999999+00:00[UTC]", "1s"),
-            ("2024-12-01T12:58:59.999999999+08:00[Asia/Singapore]", "1m"),
-            ("2024-12-01T16:58:59+13:00[Pacific/Auckland]", "1h 1m 1s"),
+            ("2024-12-01T04:59:58.999999999+00:00[UTC]", "2s"),
+            ("2024-12-01T12:58:59.999+08:00[Asia/Singapore]", "1m 1s"),
+            ("2024-12-01T16:59:00+13:00[Pacific/Auckland]", "1h 1m"),
         ];
 
         for (zdt_str, expected_unlock_time) in test_cases {
